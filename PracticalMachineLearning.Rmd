@@ -37,7 +37,7 @@ training <- training[, colMeans(is.na(training))< 0.10]
 training.cols = ncol(training)
 ```
 
-The size of columns are reduced to `r training.cols`. Also near zero variance predictors are removed, but are is no pressence of near zero variance predictors.
+The size of columns are reduced to `r training.cols`. Also near zero variance predictors are removed, but are is no pressence of near zero variance predictorsin the remaining columns.
 
 ```{r echo = TRUE}
 nearZeroColumns <- nearZeroVar(training, saveMetrics = TRUE)
@@ -68,22 +68,16 @@ training.test  <- training[-training.train.index,]
 
 Random forest has been choosed as model algorithm. Positive factors on RF are the speed, the interpretability and dealing with overfitting. Therefore, it's always better to use more trees, memory and computational power allowing.
 
-The algorithm allows for good in-training estimates of variable importance and generalization error, which largely eliminates the need for a separate validation stage, but cross validation has been used as a prudent mesure before submitting the testing results. The FR has been trained with 70% of the training data and 500 trees.
+The algorithm allows for good in-training estimates of variable importance and generalization error, which largely eliminates the need for a separate validation stage. But in order to obtain an out of sample rate and to compare with the train method from caret, the model will be training using 70% of the training data.
 
 ```{r echo = TRUE}
-model.rf <- randomForest(classe~.,data=training.train,ntree=500)
-training.train.prediction <- predict(model.rf,newdata=training.train)
-confusionMatrix(training.train.prediction,training.train$classe)
-```
-
-We have an accuracy of 100%. We hope that there is not too much overfitting. We now test our model on our 30% test set from the training data.
-
-```{r echo = TRUE}
-training.test.prediction <- predict(model.rf,newdata=training.test)
+model.rf.1 <- randomForest(classe~.,data=training.train,ntree=100)
+model.rf.1
+training.test.prediction <- predict(model.rf.1,newdata=training.test)
 confusionMatrix(training.test.prediction,training.test$classe)
 ```
 
-We have an estimated out of sample error rate of 0.56% (1-Accuracy). This is a good result.
+We have an estimated out of bag error of 0.76%. Accuracy is 99.60%, out of sample is 0.40%
 
 # Prediction
 
@@ -103,6 +97,24 @@ pml_write_files = function(x){
 pml_write_files(testing.prediction)
 ```
 
+After submitted the result to the web site, 100% accurary on the testing set has been achieved.
+
 # Conclusion
 
 Random forest looks like good choice to predict the data, it would be interesting to try different configuration params for training or using another algorithms.
+
+# More Experiments
+
+Now, we are taking advantages of caret package, the numbers of predictors will be selected by the process, using 10 folds and will train using 4 different predictor selection set size, it will take 40 times longer than the single training
+
+```{r echo = TRUE}
+control <- trainControl(method = "repeatedcv",number=10)
+model.rf.2 <- train(classe ~ ., training.train,method='rf',trControl=control,ntree=100,tuneLength=4)
+model.rf.2
+model.rf.2$finalModel
+training.test=training[!(rownames(training) %in% rownames(model.rf.2$trainingData)),]
+training.test.prediction <- predict(model.rf.2,newdata=training.test)
+confusionMatrix(training.test.prediction,training.test$classe)
+```
+
+We have an estimated out of sample error rate of 0.68% using 18 predictors at each split. test set leave out by train is calculated from training not selecting the trainingData selected by the process. On the test set we have an accurary of 99.60%, out of sample error of 0.40%.
